@@ -1,16 +1,43 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-// import * as sqs from 'aws-cdk-lib/aws-sqs';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as events from "aws-cdk-lib/aws-events";
+import * as targets from 'aws-cdk-lib/aws-events-targets';
+import * as iam from 'aws-cdk-lib/aws-iam';
 
 export class AwsCostalertSlackappStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // The code that defines your stack goes here
+    // lambda-layer
+    const layer = new lambda.LayerVersion(this, 'MyLayer', {
+      code: lambda.Code.fromAsset("lambda_layer"),
+      compatibleRuntimes: [lambda.Runtime.PYTHON_3_9],
+    });
+    
+    // lambda
+    const sampleLambda = new lambda.Function(this, 'NotifyPriceHandler', {
+      runtime: lambda.Runtime.PYTHON_3_9,    // execution environment
+      code: lambda.Code.fromAsset('lambda'),  // code loaded from "lambda" directory
+      handler: 'app.handler',                // file is "hello", function is "handler"
+      environment: {
+        TZ: 'Asia/Tokyo',
+        SLACK_POST_URL: 'URL',
+        SLACK_CHANNEL: 'channel',
+      },
+      layers: [layer],
+      initialPolicy: [new iam.PolicyStatement({
+        actions: ['ce:GetCostAndUsage'],
+        resources: ['*'],
+      })],
+    });
 
-    // example resource
-    // const queue = new sqs.Queue(this, 'AwsCostalertSlackappQueue', {
-    //   visibilityTimeout: cdk.Duration.seconds(300)
-    // });
+    // EventBridge
+    new events.Rule(this, "sampleRule", {
+      // JST で毎日 AM9:10 に定期実行
+      // 参考 https://docs.aws.amazon.com/ja_jp/AmazonCloudWatch/latest/events/ScheduledEvents.html#CronExpressions
+      schedule: events.Schedule.cron({minute: "10", hour: "0"}),
+      targets: [new targets.LambdaFunction(sampleLambda, {retryAttempts: 3})],
+  });
   }
 }

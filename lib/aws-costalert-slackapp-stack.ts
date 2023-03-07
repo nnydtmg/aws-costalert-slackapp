@@ -5,7 +5,7 @@ import * as events from "aws-cdk-lib/aws-events";
 import * as targets from 'aws-cdk-lib/aws-events-targets';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
-import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
+// import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 
 export class AwsCostalertSlackappStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {

@@ -67,7 +67,7 @@ def get_secret():
     return secret
 
 def handler(event, context):
-  text = "ID:{} の {}までのAWS合計料金 : ${}".format(id_info['Account'], END_DATE, get_total_cost())
+  text = "ID:{} の {}から{}までのAWS合計料金 : ${}".format(id_info['Account'], START_DATE, END_DATE, get_total_cost())
   content = {"text": text}
 
   secret = ast.literal_eval(get_secret())

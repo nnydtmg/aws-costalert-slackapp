@@ -16,7 +16,7 @@ export class AwsCostalertSlackappStack extends cdk.Stack {
     // lambda-layer
     const layer = new lambda.LayerVersion(this, 'MyLayer', {
       code: lambda.Code.fromAsset("lambda_layer"),
-      compatibleRuntimes: [lambda.Runtime.PYTHON_3_9],
+      compatibleRuntimes: [lambda.Runtime.PYTHON_3_13],
     });
     
     const executionLambdaRole = new iam.Role(
@@ -29,16 +29,30 @@ export class AwsCostalertSlackappStack extends cdk.Stack {
           iam.ManagedPolicy.fromAwsManagedPolicyName(
             'service-role/AWSLambdaBasicExecutionRole'
           ),
-          iam.ManagedPolicy.fromAwsManagedPolicyName(
-            'SecretsManagerReadWrite'
-          )
         ],
       }
     );
 
+    // Slack の投稿先 URL を保持するシークレット（lambda/app.py の secret_name / region_name と合わせる）。
+    // 以前は AWS 管理ポリシー SecretsManagerReadWrite（全シークレットの読み書き）を付与していたが、
+    // Lambda が必要とするのはこのシークレットの読み取りのみなので GetSecretValue に絞る。
+    // 末尾の "-??????" は Secrets Manager がシークレット ARN に付与するランダムな 6 文字。
+    executionLambdaRole.addToPolicy(new iam.PolicyStatement({
+      actions: ['secretsmanager:GetSecretValue'],
+      resources: [
+        cdk.Stack.of(this).formatArn({
+          service: 'secretsmanager',
+          region: 'ap-northeast-1',
+          resource: 'secret',
+          resourceName: 'alertapp/url-??????',
+          arnFormat: cdk.ArnFormat.COLON_RESOURCE_NAME,
+        }),
+      ],
+    }));
+
     // lambda
     const costalertLambda = new lambda.Function(this, 'NotifyPriceHandler', {
-      runtime: lambda.Runtime.PYTHON_3_9,    // execution environment
+      runtime: lambda.Runtime.PYTHON_3_13,    // execution environment
       code: lambda.Code.fromAsset('lambda'),  // code loaded from "lambda" directory
       handler: 'app.handler',                // file is "hello", function is "handler"
       environment: {
@@ -47,6 +61,7 @@ export class AwsCostalertSlackappStack extends cdk.Stack {
       },
       layers: [layer],
       initialPolicy: [new iam.PolicyStatement({
+        // Cost Explorer の GetCostAndUsage はリソースレベルの権限をサポートしないため '*' が必須
         actions: ['ce:GetCostAndUsage'],
         resources: ['*'],
       })],
